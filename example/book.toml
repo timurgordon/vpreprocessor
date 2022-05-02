@@ -7,4 +7,5 @@ title = "presentation-preprocessor-example"
 [build]
 build-dir = "../docs"
 
-[preprocessor.presentation-preprocessor]
+[preprocessor.vpreprocessor]
+command = "cargo run"
