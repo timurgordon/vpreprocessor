@@ -17,6 +17,7 @@ serde_derive = "1"
 serde = "1"
 log = "0.4"
 rustc-serialize = "*"
+base64 = "*"
 
 [dependencies.redis]
 git = "https://github.com/mitsuhiko/redis-rs.git"
@@ -24,6 +25,7 @@ git = "https://github.com/mitsuhiko/redis-rs.git"
 [dependencies.uuid]
 version = "1.0.0"
 features = [
+    "serde",
     "v4",                # Lets you generate random UUIDs
     "fast-rng",          # Use a faster (but still sufficiently random) RNG
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs

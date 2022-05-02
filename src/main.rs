@@ -17,6 +17,11 @@ extern crate serde;
 extern crate log;
 extern crate redis;
 
+
+use client::MessageBusClient;
+#[path="../src/rmb/client.rs"]
+pub mod client;
+
 use docopt::Docopt;
 use mdbook::{
     book::{Book, BookItem},
@@ -85,24 +90,23 @@ impl Preprocessor for VPreProcessor {
 
     fn run(&self, _ctx: &PreprocessorContext, mut book: Book) -> Result<Book, Error> {
         debug!("Running preprocessor");
-        let res = send_book(&mut book);
 
-        /*
-        let vbook = format_book_to_vbook(book);
-        const mb = new MessageBusClient(6379)
+        let vbook = format_book_to_vbook(&mut book);
 
-        const message = mb.prepare("mdbook.preprocess", 0)
-        mb.send(message, vbook)
-        mb.read(message, function (result) {
-            console.log("result received")
-            console.log(result)
+        let mut mb = MessageBusClient::new(6379);
 
-            console.log("closing")
-            process.exit(0)
-        })
-        */
+        let message = mb.prepare("mdbook.preprocess", 0);
+        let payload = serde_json::to_string(&vbook).unwrap();
         
-        Ok(book)
+        mb.send(message.clone(), &payload);
+        let responses = mb.read(message);
+        let processed_vbook = responses[0]["dat"];
+
+        let processed_book = format_vbook_to_book(&mut book, &mut processed_vbook);
+
+        //let processed_book = responses[0]["dat"];
+        
+        Ok(processed_book)
     }
 
     fn supports_renderer(&self, renderer: &str) -> bool {
@@ -136,17 +140,33 @@ where
     return vbookitems;
 }
 
+fn vsections_to_sections<'a, I, 'b, I2>(items: I,) -> Vec<BookItem>
+where
+    I: IntoIterator<Item = &'a mut VBookItem> + 'a,
+{
+    //let mut sections: Vec<VBookItem>;
+    let mut bookitems = Vec::new();
+    for item in items {
+        if let VBookItem::Chapter(ref mut ch) = *item {
+            let bookitem = BookItem {
+                chapter: Chapter {
+                    name: ch.name.clone(),
+                    content: ch.content.clone(),
+                    sub_items: sections_to_vsections(&mut ch.sub_items)
+                }
+            }; 
+            vbookitems.push(vbookitem);
+        }
+    }
+    return vbookitems;
+}
+
 fn format_book_to_vbook(book: &mut Book) -> VBook{
     let vbook = VBook { sections: sections_to_vsections(&mut book.sections) };
     return vbook;
 }
 
-fn send_book(book: &mut Book) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1:6379")?;
-    let formatted = format_book_to_vbook(book);
-    let mut con = client.get_connection()?;
-    let encoded = serde_json::to_string(&formatted).unwrap();
-    let _ : () = con.set("formatted_vbook", encoded)?;
-    //return(con)
-    Ok(())
+fn format_vbook_to_book(book: &mut Book, vbook: &mut VBook) -> VBook{
+    let book = Book { sections: vsections_to_sections(&mut book.sections, &mut vbook.sections) };
+    return book;
 }
